@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Libra — Free Books for Everyone</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#" class="logo">LIBRA</a>
+      <div class="nav-links">
+        <a href="#books">Books</a>
+        <a href="#comments">Reviews</a>
+        <button class="suggest-btn" id="openSuggest">Suggest a Book</button>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- MOBILE MENU -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#books" class="mobile-link">Books</a>
+    <a href="#comments" class="mobile-link">Reviews</a>
+    <button class="mobile-suggest" id="openSuggestMobile">Suggest a Book</button>
+  </div>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-tag">Free · Open · For Everyone</div>
+    <h1 class="hero-title">
+      <span>Read the</span>
+      <em>world's</em>
+      <span>greatest books</span>
+    </h1>
+    <p class="hero-sub">Curated classics and contemporary titles — all free, forever.</p>
+    <a href="#books" class="hero-cta">Browse the Collection ↓</a>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-num">200+</span><span class="stat-label">Free Books</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><span class="stat-num">2</span><span class="stat-label">Source Libraries</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat"><span class="stat-num">0₹</span><span class="stat-label">Always Free</span></div>
+    </div>
+  </header>
+
+  <!-- BOOKS SECTION -->
+  <section class="books-section" id="books">
+    <div class="section-header">
+      <span class="section-tag">The Collection</span>
+      <h2>Featured Titles</h2>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" data-genre="all">All</button>
+      <button class="filter-btn" data-genre="fiction">Fiction</button>
+      <button class="filter-btn" data-genre="philosophy">Philosophy</button>
+      <button class="filter-btn" data-genre="science">Science</button>
+      <button class="filter-btn" data-genre="self-help">Self-Help</button>
+      <button class="filter-btn" data-genre="classic">Classics</button>
+    </div>
+
+    <div class="books-grid" id="booksGrid">
+
+      <div class="book-card" data-genre="fiction" data-title="1984" data-author="George Orwell">
+        <div class="book-cover" style="background: linear-gradient(135deg,#1a1a2e,#16213e);">
+          <div class="cover-art cover-1984"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Fiction</div>
+          <h3>1984</h3>
+          <p class="book-author">George Orwell</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="fiction" data-title="To Kill a Mockingbird" data-author="Harper Lee">
+        <div class="book-cover" style="background: linear-gradient(135deg,#2d4a22,#4a7c59);">
+          <div class="cover-art cover-mockingbird"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Fiction</div>
+          <h3>To Kill a Mockingbird</h3>
+          <p class="book-author">Harper Lee</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="classic" data-title="The Great Gatsby" data-author="F. Scott Fitzgerald">
+        <div class="book-cover" style="background: linear-gradient(135deg,#1c1c3a,#2e2e5e);">
+          <div class="cover-art cover-gatsby"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Classic</div>
+          <h3>The Great Gatsby</h3>
+          <p class="book-author">F. Scott Fitzgerald</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="philosophy" data-title="Meditations" data-author="Marcus Aurelius">
+        <div class="book-cover" style="background: linear-gradient(135deg,#3d2b1f,#7a5c44);">
+          <div class="cover-art cover-meditations"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Philosophy</div>
+          <h3>Meditations</h3>
+          <p class="book-author">Marcus Aurelius</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="science" data-title="A Brief History of Time" data-author="Stephen Hawking">
+        <div class="book-cover" style="background: linear-gradient(135deg,#0a0a1a,#1a1a4e);">
+          <div class="cover-art cover-hawking"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Science</div>
+          <h3>A Brief History of Time</h3>
+          <p class="book-author">Stephen Hawking</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="self-help" data-title="Atomic Habits" data-author="James Clear">
+        <div class="book-cover" style="background: linear-gradient(135deg,#1a3a1a,#2d6a2d);">
+          <div class="cover-art cover-atomic"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Self-Help</div>
+          <h3>Atomic Habits</h3>
+          <p class="book-author">James Clear</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="fiction" data-title="The Alchemist" data-author="Paulo Coelho">
+        <div class="book-cover" style="background: linear-gradient(135deg,#3a2000,#8b5e00);">
+          <div class="cover-art cover-alchemist"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Fiction</div>
+          <h3>The Alchemist</h3>
+          <p class="book-author">Paulo Coelho</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="philosophy" data-title="Thus Spoke Zarathustra" data-author="Friedrich Nietzsche">
+        <div class="book-cover" style="background: linear-gradient(135deg,#2a0a0a,#5c1a1a);">
+          <div class="cover-art cover-nietzsche"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Philosophy</div>
+          <h3>Thus Spoke Zarathustra</h3>
+          <p class="book-author">Friedrich Nietzsche</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="science" data-title="Sapiens" data-author="Yuval Noah Harari">
+        <div class="book-cover" style="background: linear-gradient(135deg,#1a1008,#4a3010);">
+          <div class="cover-art cover-sapiens"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Science</div>
+          <h3>Sapiens</h3>
+          <p class="book-author">Yuval Noah Harari</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="classic" data-title="Crime and Punishment" data-author="Fyodor Dostoevsky">
+        <div class="book-cover" style="background: linear-gradient(135deg,#0d0d1a,#1a1a3a);">
+          <div class="cover-art cover-crime"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Classic</div>
+          <h3>Crime and Punishment</h3>
+          <p class="book-author">Fyodor Dostoevsky</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="self-help" data-title="The Power of Now" data-author="Eckhart Tolle">
+        <div class="book-cover" style="background: linear-gradient(135deg,#001a1a,#003a3a);">
+          <div class="cover-art cover-power"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Self-Help</div>
+          <h3>The Power of Now</h3>
+          <p class="book-author">Eckhart Tolle</p>
+        </div>
+      </div>
+
+      <div class="book-card" data-genre="classic" data-title="Pride and Prejudice" data-author="Jane Austen">
+        <div class="book-cover" style="background: linear-gradient(135deg,#2a1a0a,#6b4226);">
+          <div class="cover-art cover-pride"></div>
+          <div class="book-overlay"><span>View Sources</span></div>
+        </div>
+        <div class="book-info">
+          <div class="book-genre-tag">Classic</div>
+          <h3>Pride and Prejudice</h3>
+          <p class="book-author">Jane Austen</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- COMMENTS SECTION -->
+  <section class="comments-section" id="comments">
+    <div class="section-header">
+      <span class="section-tag">Community</span>
+      <h2>Reader Reviews</h2>
+    </div>
+
+    <div class="comments-container">
+      <div class="comment-form-wrap">
+        <h3>Leave a Review</h3>
+        <div class="comment-form" id="commentForm">
+          <div class="form-row">
+            <input type="text" id="commentName" placeholder="Your name" />
+            <input type="text" id="commentBook" placeholder="Book title" />
+          </div>
+          <textarea id="commentText" placeholder="Share your thoughts about a book..." rows="4"></textarea>
+          <div class="form-footer">
+            <div class="star-rating" id="starRating">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star" data-val="5">★</span>
+            </div>
+            <button class="submit-btn" id="submitComment">Post Review</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="comments-list" id="commentsList">
+        <!-- seed comments -->
+        <div class="comment-card">
+          <div class="comment-header">
+            <div class="comment-avatar">A</div>
+            <div>
+              <strong>Arjun M.</strong>
+              <span class="comment-book">1984</span>
+            </div>
+            <div class="comment-stars">★★★★★</div>
+          </div>
+          <p>Orwell's masterpiece shook me to my core. The way he writes about surveillance and freedom feels more relevant today than ever.</p>
+        </div>
+        <div class="comment-card">
+          <div class="comment-header">
+            <div class="comment-avatar">P</div>
+            <div>
+              <strong>Priya S.</strong>
+              <span class="comment-book">Atomic Habits</span>
+            </div>
+            <div class="comment-stars">★★★★☆</div>
+          </div>
+          <p>Incredibly practical. Changed the way I approach every single day. James Clear writes with such clarity and purpose.</p>
+        </div>
+        <div class="comment-card">
+          <div class="comment-header">
+            <div class="comment-avatar">R</div>
+            <div>
+              <strong>Rohan K.</strong>
+              <span class="comment-book">Meditations</span>
+            </div>
+            <div class="comment-stars">★★★★★</div>
+          </div>
+          <p>Meditations is the kind of book you return to every year and find something new. Marcus Aurelius writes like he's talking directly to you.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="logo">LIBRA</span>
+        <p>A free library for curious minds.</p>
+      </div>
+      <div class="footer-note">
+        Books are sourced via PDFDrive & OceanPDF.<br/>Libra does not host any files.
+      </div>
+    </div>
+    <div class="footer-bottom">© 2025 Libra. Made with love for readers.</div>
+  </footer>
+
+  <!-- BOOK MODAL -->
+  <div class="modal-overlay" id="bookModal">
+    <div class="modal">
+      <button class="modal-close" id="closeModal">✕</button>
+      <div class="modal-cover" id="modalCover"></div>
+      <div class="modal-content">
+        <div class="modal-tag" id="modalGenre"></div>
+        <h2 id="modalTitle"></h2>
+        <p class="modal-author" id="modalAuthor"></p>
+        <p class="modal-desc">Choose your preferred source to read or download this book for free:</p>
+        <div class="modal-sources">
+          <a class="source-btn pdfdrive" id="pdfDriveLink" target="_blank" rel="noopener">
+            <div class="source-icon">📄</div>
+            <div>
+              <strong>PDF Drive</strong>
+              <span>Millions of free PDFs</span>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+          <a class="source-btn oceanpdf" id="oceanPdfLink" target="_blank" rel="noopener">
+            <div class="source-icon">🌊</div>
+            <div>
+              <strong>Ocean of PDF</strong>
+              <span>Search & download</span>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUGGEST MODAL -->
+  <div class="modal-overlay" id="suggestModal">
+    <div class="modal suggest-modal">
+      <button class="modal-close" id="closeSuggest">✕</button>
+      <div class="modal-content">
+        <div class="modal-tag">Suggestion</div>
+        <h2>Suggest a Book</h2>
+        <p class="modal-desc">We'd love to hear what you want to read. Your suggestion goes directly to our curator.</p>
+        <form id="suggestForm" action="https://formsubmit.co/sharmanaitik995@gmail.com" method="POST" target="_blank">
+          <input type="hidden" name="_subject" value="New Book Suggestion — Libra" />
+          <input type="hidden" name="_captcha" value="false" />
+          <div class="suggest-fields">
+            <input type="text" name="name" placeholder="Your name" required />
+            <input type="email" name="email" placeholder="Your email (optional)" />
+            <input type="text" name="book_title" placeholder="Book title *" required />
+            <input type="text" name="author" placeholder="Author name" />
+            <textarea name="message" placeholder="Why should we add this book?" rows="3"></textarea>
+          </div>
+          <button type="submit" class="submit-btn full-width">Send Suggestion ✉</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
