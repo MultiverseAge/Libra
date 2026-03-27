@@ -1,284 +1,514 @@
 /* =============================================
-   LIBRA — script.js
-   Handles: modals, filtering, comments, nav
+   LIBRA v2 — script.js
+   Features:
+   - Seed library with Open Library real covers
+   - AI-powered book metadata fetch (Anthropic API)
+   - Open Library cover image fetch
+   - Genre filter + search
+   - Book detail modal (PDFDrive + OceanPDF links)
+   - Admin add book flow
+   - Visitor suggestion form (FormSubmit)
+   - Comments / reviews
    ============================================= */
 
-// ── DOM references ──────────────────────────────
-const bookCards       = document.querySelectorAll('.book-card');
-const filterBtns      = document.querySelectorAll('.filter-btn');
-const bookModal       = document.getElementById('bookModal');
-const closeModal      = document.getElementById('closeModal');
-const suggestModal    = document.getElementById('suggestModal');
-const openSuggest     = document.getElementById('openSuggest');
-const openSuggestMob  = document.getElementById('openSuggestMobile');
-const closeSuggest    = document.getElementById('closeSuggest');
-const hamburger       = document.getElementById('hamburger');
-const mobileMenu      = document.getElementById('mobileMenu');
-const submitComment   = document.getElementById('submitComment');
-const commentsList    = document.getElementById('commentsList');
-const stars           = document.querySelectorAll('.star');
-const mobileLinks     = document.querySelectorAll('.mobile-link');
+// ─── SEED DATA ────────────────────────────────
+const SEED_BOOKS = [
+  { title: "1984",                       author: "George Orwell",         genre: "fiction",    year: "1949", desc: "A chilling vision of a totalitarian future where Big Brother watches your every move." },
+  { title: "To Kill a Mockingbird",      author: "Harper Lee",            genre: "classic",    year: "1960", desc: "A profound tale of racial injustice and moral growth in the American South." },
+  { title: "The Great Gatsby",           author: "F. Scott Fitzgerald",   genre: "classic",    year: "1925", desc: "A glittering portrait of the Jazz Age and the hollow pursuit of the American Dream." },
+  { title: "Meditations",                author: "Marcus Aurelius",       genre: "philosophy", year: "180",  desc: "Personal writings of the Roman Emperor — a timeless guide to Stoic living." },
+  { title: "A Brief History of Time",    author: "Stephen Hawking",       genre: "science",    year: "1988", desc: "Hawking's landmark exploration of the cosmos, black holes, and the nature of time." },
+  { title: "Atomic Habits",              author: "James Clear",           genre: "self-help",  year: "2018", desc: "A proven framework for building good habits and breaking bad ones, one percent at a time." },
+  { title: "The Alchemist",              author: "Paulo Coelho",          genre: "fiction",    year: "1988", desc: "A shepherd boy's journey across the desert in pursuit of his Personal Legend." },
+  { title: "Sapiens",                    author: "Yuval Noah Harari",     genre: "science",    year: "2011", desc: "A sweeping history of humankind from the Stone Age to the twenty-first century." },
+  { title: "Crime and Punishment",       author: "Fyodor Dostoevsky",     genre: "classic",    year: "1866", desc: "A psychological portrait of guilt, punishment, and redemption in Tsarist Russia." },
+  { title: "The Power of Now",           author: "Eckhart Tolle",         genre: "self-help",  year: "1997", desc: "A spiritual guide to living fully in the present moment and escaping the thinking mind." },
+  { title: "Thus Spoke Zarathustra",     author: "Friedrich Nietzsche",   genre: "philosophy", year: "1883", desc: "Nietzsche's philosophical novel exploring the Übermensch, the will to power, and eternal return." },
+  { title: "Pride and Prejudice",        author: "Jane Austen",           genre: "classic",    year: "1813", desc: "The witty story of Elizabeth Bennet and Mr. Darcy — a masterpiece of English literature." },
+];
 
-let selectedRating = 0;
+// ─── STATE ────────────────────────────────────
+let library    = [];   // array of book objects
+let activeGenre = 'all';
+let searchQuery = '';
+let selectedStars = 0;
 
-// ── Utility: encode book title for search URLs ───
-function encodeSearch(title) {
-  return encodeURIComponent(title);
+// ─── OPEN LIBRARY COVER FETCH ─────────────────
+// Returns best available cover URL or null
+async function fetchOpenLibraryCover(title, author) {
+  try {
+    const q = encodeURIComponent(`title:${title} author:${author}`);
+    const res = await fetch(`https://openlibrary.org/search.json?q=${q}&limit=5&fields=key,cover_i,isbn`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const docs = data.docs || [];
+
+    for (const doc of docs) {
+      if (doc.cover_i) {
+        return `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+      }
+      if (doc.isbn && doc.isbn.length) {
+        return `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-L.jpg`;
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
-function buildPdfDriveUrl(title) {
-  return `https://www.pdfdrive.com.co/?s=${encodeSearch(title)}`;
+// Also try a simpler title-only search as fallback
+async function fetchCoverFallback(title) {
+  try {
+    const q = encodeURIComponent(title);
+    const res = await fetch(`https://openlibrary.org/search.json?title=${q}&limit=3&fields=cover_i`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const doc = (data.docs || []).find(d => d.cover_i);
+    if (doc) return `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+  } catch (_) {}
+  return null;
 }
 
-function buildOceanPdfUrl(title) {
-  return `https://oceanofpdf.com/?s=${encodeSearch(title)}`;
+async function getBookCover(title, author) {
+  let url = await fetchOpenLibraryCover(title, author);
+  if (!url) url = await fetchCoverFallback(title);
+  return url;
 }
 
-// ── Book Modal ────────────────────────────────────
-bookCards.forEach(card => {
-  card.addEventListener('click', () => openBookModal(card));
-});
+// ─── ANTHROPIC API — AI BOOK METADATA ─────────
+async function fetchBookMetadataFromAI(rawTitle) {
+  const prompt = `You are a book database. Given a book title, return ONLY a valid JSON object with these exact keys:
+{
+  "title": "...",
+  "author": "...",
+  "genre": "fiction|classic|philosophy|science|self-help|biography|other",
+  "year": "YYYY",
+  "desc": "Two-sentence description of the book."
+}
+Book title: "${rawTitle}"
+Return ONLY the JSON, no markdown, no extra text.`;
 
-function openBookModal(card) {
-  const title  = card.dataset.title;
-  const author = card.dataset.author;
-  const genre  = card.dataset.genre;
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 400,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
 
-  // Clone the cover into the modal mini-cover
-  const coverEl   = card.querySelector('.book-cover');
-  const modalCover = document.getElementById('modalCover');
-  modalCover.style.background = coverEl.style.background;
-  modalCover.className = 'modal-cover';
-
-  // Set text fields
-  document.getElementById('modalTitle').textContent  = title;
-  document.getElementById('modalAuthor').textContent = `by ${author}`;
-  document.getElementById('modalGenre').textContent  = capitalize(genre);
-
-  // Build source links
-  document.getElementById('pdfDriveLink').href  = buildPdfDriveUrl(title);
-  document.getElementById('oceanPdfLink').href  = buildOceanPdfUrl(title);
-
-  openModal(bookModal);
+  if (!response.ok) throw new Error("API error " + response.status);
+  const data = await response.json();
+  const text = data.content.map(b => b.text || "").join("").trim();
+  // Strip any accidental markdown fences
+  const clean = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(clean);
 }
 
-closeModal.addEventListener('click', () => closeModalFn(bookModal));
+// ─── COLOUR GRADIENTS FOR FALLBACK COVERS ─────
+const GRADIENTS = [
+  "linear-gradient(135deg,#1a1a2e,#16213e)",
+  "linear-gradient(135deg,#2d4a22,#4a7c59)",
+  "linear-gradient(135deg,#1c1c3a,#2e2e5e)",
+  "linear-gradient(135deg,#3d2b1f,#7a5c44)",
+  "linear-gradient(135deg,#0a0a1a,#1a1a4e)",
+  "linear-gradient(135deg,#1a3a1a,#2d6a2d)",
+  "linear-gradient(135deg,#3a2000,#8b5e00)",
+  "linear-gradient(135deg,#1a1008,#4a3010)",
+  "linear-gradient(135deg,#0d0d1a,#1a1a3a)",
+  "linear-gradient(135deg,#001a1a,#003a3a)",
+  "linear-gradient(135deg,#2a0a0a,#5c1a1a)",
+  "linear-gradient(135deg,#2a1a0a,#6b4226)",
+];
+let gradientIndex = 0;
+function nextGradient() { return GRADIENTS[gradientIndex++ % GRADIENTS.length]; }
 
-// ── Suggest Modal ─────────────────────────────────
-[openSuggest, openSuggestMob].forEach(btn => {
-  btn?.addEventListener('click', () => {
-    closeMobileMenu();
-    openModal(suggestModal);
+// ─── BUILD BOOK CARD ──────────────────────────
+function buildCard(book) {
+  const card = document.createElement('div');
+  card.className = 'book-card';
+  card.dataset.genre = book.genre;
+  card.dataset.title = book.title.toLowerCase();
+  card.dataset.author = (book.author || '').toLowerCase();
+
+  const firstLetter = book.title.charAt(0).toUpperCase();
+  const gradient = book._gradient || nextGradient();
+  book._gradient = gradient;
+
+  card.innerHTML = `
+    <div class="cover-wrap" style="background:${gradient}">
+      ${book.coverUrl
+        ? `<img class="cover-img" src="${book.coverUrl}" alt="${escHtml(book.title)} cover" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>`
+        : ''}
+      <div class="cover-fallback" style="${book.coverUrl ? 'display:none' : ''}">
+        <div class="fallback-letter">${firstLetter}</div>
+        <div class="fallback-title">${escHtml(book.title)}</div>
+      </div>
+      <div class="cover-hover"><span>View Sources</span></div>
+    </div>
+    <div class="card-genre">${escHtml(book.genre)}</div>
+    <div class="card-title">${escHtml(book.title)}</div>
+    <div class="card-author">${escHtml(book.author || '')}</div>
+    ${book.year ? `<div class="card-year">${escHtml(String(book.year))}</div>` : ''}
+  `;
+
+  card.addEventListener('click', () => openBookModal(book, card));
+  return card;
+}
+
+// ─── RENDER GRID ──────────────────────────────
+function renderGrid() {
+  const grid = $('booksGrid');
+  const empty = $('emptyState');
+  grid.innerHTML = '';
+
+  const filtered = library.filter(b => {
+    const genreMatch = activeGenre === 'all' || b.genre === activeGenre;
+    const q = searchQuery.toLowerCase();
+    const searchMatch = !q || b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q);
+    return genreMatch && searchMatch;
+  });
+
+  if (!filtered.length) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    filtered.forEach((b, i) => {
+      const card = buildCard(b);
+      card.style.animationDelay = `${i * 0.04}s`;
+      grid.appendChild(card);
+    });
+  }
+  $('statCount').textContent = library.length;
+}
+
+// ─── LOAD SEED BOOKS ──────────────────────────
+async function loadSeedBooks() {
+  for (const b of SEED_BOOKS) {
+    library.push({ ...b, coverUrl: null });
+  }
+  renderGrid();
+
+  // Fetch covers async and update cards live
+  for (const b of library) {
+    const url = await getBookCover(b.title, b.author);
+    if (url) {
+      b.coverUrl = url;
+      // Update any rendered card for this book
+      updateCardCover(b);
+    }
+  }
+}
+
+function updateCardCover(book) {
+  const cards = document.querySelectorAll('.book-card');
+  for (const card of cards) {
+    if (card.dataset.title === book.title.toLowerCase()) {
+      const wrap = card.querySelector('.cover-wrap');
+      const existingImg = wrap.querySelector('.cover-img');
+      const fb = wrap.querySelector('.cover-fallback');
+      if (existingImg) {
+        existingImg.src = book.coverUrl;
+        existingImg.style.display = 'block';
+        if (fb) fb.style.display = 'none';
+      } else {
+        const img = document.createElement('img');
+        img.className = 'cover-img';
+        img.src = book.coverUrl;
+        img.alt = book.title + ' cover';
+        img.loading = 'lazy';
+        img.onerror = function() { this.style.display = 'none'; if (fb) fb.style.display = 'flex'; };
+        if (fb) fb.style.display = 'none';
+        wrap.insertBefore(img, wrap.querySelector('.cover-fallback'));
+      }
+    }
+  }
+}
+
+// ─── BOOK DETAIL MODAL ────────────────────────
+function openBookModal(book, _card) {
+  const bmImg  = $('bmImg');
+  const bmFb   = $('bmFb');
+
+  if (book.coverUrl) {
+    bmImg.src = book.coverUrl;
+    bmImg.style.display = 'block';
+    bmFb.style.display = 'none';
+  } else {
+    bmImg.style.display = 'none';
+    bmFb.style.display = 'flex';
+    bmFb.style.background = book._gradient || '#1a1a2e';
+    bmFb.textContent = book.title.charAt(0).toUpperCase();
+  }
+
+  $('bmGenre').textContent = cap(book.genre);
+  $('bmTitle').textContent = book.title;
+  $('bmAuthor').textContent = 'by ' + (book.author || 'Unknown');
+  $('bmDesc').textContent  = book.desc || 'A wonderful read available for free.';
+  $('bmPdf').href   = `https://www.pdfdrive.com.co/?s=${enc(book.title)}`;
+  $('bmOcean').href = `https://oceanofpdf.com/?s=${enc(book.title)}`;
+
+  openOverlay('bookModal');
+}
+
+// ─── FILTER & SEARCH ──────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeGenre = btn.dataset.genre;
+    renderGrid();
   });
 });
 
-closeSuggest.addEventListener('click', () => closeModalFn(suggestModal));
-
-// Close modals on overlay click
-[bookModal, suggestModal].forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeModalFn(overlay);
-  });
+$('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderGrid();
 });
 
-// Close modals on Escape
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeModalFn(bookModal);
-    closeModalFn(suggestModal);
+// ─── ADMIN MODAL — AI AUTO-FILL ───────────────
+const aiFetchBtn = $('aiFetchBtn');
+const aiInput    = $('aiInput');
+let pendingCoverUrl = null;
+
+aiFetchBtn.addEventListener('click', async () => {
+  const title = aiInput.value.trim();
+  if (!title) { shake(aiFetchBtn); toast('Enter a book title first.'); return; }
+
+  // Show spinner
+  $('fetchLabel').style.display = 'none';
+  $('fetchSpinner').style.display = 'inline-block';
+  aiFetchBtn.disabled = true;
+
+  try {
+    // 1. Fetch metadata from AI
+    const meta = await fetchBookMetadataFromAI(title);
+
+    // 2. Populate fields
+    $('pfTitle').value  = meta.title  || title;
+    $('pfAuthor').value = meta.author || '';
+    $('pfYear').value   = meta.year   || '';
+    $('pfDesc').value   = meta.desc   || '';
+    const genreEl = $('pfGenre');
+    if (meta.genre) {
+      for (const opt of genreEl.options) {
+        if (opt.value === meta.genre) { genreEl.value = meta.genre; break; }
+      }
+    }
+
+    // 3. Show preview (cover loading state)
+    $('aiPreview').style.display = 'block';
+    $('confirmAdd').style.display = 'block';
+    $('previewFb').textContent = (meta.title || title).charAt(0).toUpperCase();
+    $('previewImg').style.display = 'none';
+    $('coverLoading').style.display = 'flex';
+    pendingCoverUrl = null;
+
+    // 4. Fetch cover async
+    const coverUrl = await getBookCover(meta.title || title, meta.author || '');
+    $('coverLoading').style.display = 'none';
+    if (coverUrl) {
+      pendingCoverUrl = coverUrl;
+      $('previewImg').src = coverUrl;
+      $('previewImg').style.display = 'block';
+      $('previewFb').style.display = 'none';
+    } else {
+      $('previewFb').style.display = 'flex';
+    }
+
+    toast('✦ Metadata filled! Review and confirm.');
+  } catch (err) {
+    console.error(err);
+    toast('Could not fetch metadata. Fill in manually.');
+    $('aiPreview').style.display = 'block';
+    $('confirmAdd').style.display = 'block';
+    $('pfTitle').value = title;
+    $('coverLoading').style.display = 'none';
+    $('previewFb').textContent = title.charAt(0).toUpperCase();
+  } finally {
+    $('fetchLabel').style.display = 'inline';
+    $('fetchSpinner').style.display = 'none';
+    aiFetchBtn.disabled = false;
   }
 });
 
-function openModal(overlay) {
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
+$('confirmAdd').addEventListener('click', () => {
+  const title  = $('pfTitle').value.trim();
+  const author = $('pfAuthor').value.trim();
+  if (!title) { shake($('pfTitle')); toast('Title is required.'); return; }
+
+  const book = {
+    title,
+    author,
+    genre:    $('pfGenre').value,
+    year:     $('pfYear').value.trim(),
+    desc:     $('pfDesc').value.trim(),
+    coverUrl: pendingCoverUrl || null,
+  };
+
+  library.unshift(book);
+  renderGrid();
+  closeOverlay('adminModal');
+  toast(`"${title}" added to the library ✓`);
+
+  // Reset admin form
+  aiInput.value = '';
+  $('aiPreview').style.display = 'none';
+  $('confirmAdd').style.display = 'none';
+  $('previewImg').style.display = 'none';
+  $('previewFb').textContent = '';
+  pendingCoverUrl = null;
+
+  // If cover wasn't loaded yet, try again in background
+  if (!book.coverUrl) {
+    getBookCover(title, author).then(url => {
+      if (url) { book.coverUrl = url; updateCardCover(book); }
+    });
+  }
+});
+
+// ─── STAR RATING ──────────────────────────────
+document.querySelectorAll('.star').forEach(s => {
+  s.addEventListener('click', () => {
+    selectedStars = parseInt(s.dataset.val);
+    highlightStars(selectedStars);
+  });
+  s.addEventListener('mouseenter', () => highlightStars(parseInt(s.dataset.val)));
+});
+$('starRating').addEventListener('mouseleave', () => highlightStars(selectedStars));
+
+function highlightStars(n) {
+  document.querySelectorAll('.star').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.val) <= n);
+  });
 }
 
-function closeModalFn(overlay) {
-  overlay.classList.remove('open');
+// ─── SUBMIT COMMENT ───────────────────────────
+$('submitComment').addEventListener('click', () => {
+  const name = $('cName').value.trim();
+  const book = $('cBook').value.trim();
+  const text = $('cText').value.trim();
+  if (!name || !text) { shake($('submitComment')); toast('Name and review are required.'); return; }
+
+  const filled = '★'.repeat(selectedStars);
+  const empty  = '☆'.repeat(5 - selectedStars);
+
+  const card = document.createElement('div');
+  card.className = 'comment-card';
+  card.innerHTML = `
+    <div class="comment-header">
+      <div class="avatar">${escHtml(name.charAt(0).toUpperCase())}</div>
+      <div class="cmeta">
+        <strong>${escHtml(name)}</strong>
+        ${book ? `<span class="cbk">${escHtml(book)}</span>` : ''}
+      </div>
+      <div class="cstars">${filled + empty || '—'}</div>
+    </div>
+    <p>${escHtml(text)}</p>
+  `;
+
+  const list = $('commentsList');
+  list.insertBefore(card, list.firstChild);
+  $('cName').value = $('cBook').value = $('cText').value = '';
+  selectedStars = 0;
+  highlightStars(0);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  toast('Review posted ✓');
+});
+
+// ─── MODALS ───────────────────────────────────
+function openOverlay(id) {
+  $(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeOverlay(id) {
+  $(id).classList.remove('open');
   document.body.style.overflow = '';
 }
 
-// ── Genre Filter ──────────────────────────────────
-filterBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    filterBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+// Open triggers
+['openAdmin','openAdminMob','openAdminHero'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('click', () => { closeMobMenu(); openOverlay('adminModal'); });
+});
+['openSuggest','openSuggestMob'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('click', () => { closeMobMenu(); openOverlay('suggestModal'); });
+});
+$('addFirstBook') && $('addFirstBook').addEventListener('click', () => openOverlay('adminModal'));
 
-    const genre = btn.dataset.genre;
-
-    bookCards.forEach(card => {
-      if (genre === 'all' || card.dataset.genre === genre) {
-        card.classList.remove('hidden');
-        card.style.animation = 'fadeUp 0.4s ease both';
-      } else {
-        card.classList.add('hidden');
-      }
-    });
-  });
+// Close triggers
+[['closeBookModal','bookModal'],['closeAdminModal','adminModal'],['closeSuggestModal','suggestModal']].forEach(([btn,modal]) => {
+  const el = $(btn);
+  if (el) el.addEventListener('click', () => closeOverlay(modal));
 });
 
-// ── Star Rating ───────────────────────────────────
-stars.forEach(star => {
-  star.addEventListener('click', () => {
-    selectedRating = parseInt(star.dataset.val);
-    highlightStars(selectedRating);
-  });
-
-  star.addEventListener('mouseenter', () => {
-    highlightStars(parseInt(star.dataset.val));
-  });
+// Click outside
+['bookModal','adminModal','suggestModal'].forEach(id => {
+  $(id).addEventListener('click', e => { if (e.target === $(id)) closeOverlay(id); });
 });
 
-document.getElementById('starRating').addEventListener('mouseleave', () => {
-  highlightStars(selectedRating);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') ['bookModal','adminModal','suggestModal'].forEach(closeOverlay);
 });
 
-function highlightStars(count) {
-  stars.forEach(s => {
-    s.classList.toggle('active', parseInt(s.dataset.val) <= count);
-  });
-}
+// ─── HAMBURGER ────────────────────────────────
+const hamburger  = $('hamburger');
+const mobileMenu = $('mobileMenu');
 
-// ── Comment Submission ────────────────────────────
-submitComment.addEventListener('click', () => {
-  const name  = document.getElementById('commentName').value.trim();
-  const book  = document.getElementById('commentBook').value.trim();
-  const text  = document.getElementById('commentText').value.trim();
-
-  if (!name || !text) {
-    shakeElement(submitComment);
-    showToast('Please enter your name and review.');
-    return;
-  }
-
-  // Build star string
-  const filled = '★'.repeat(selectedRating || 0);
-  const empty  = '☆'.repeat(5 - (selectedRating || 0));
-  const starStr = filled + empty;
-
-  // Create comment card
-  const card = document.createElement('div');
-  card.className = 'comment-card';
-  card.style.animation = 'fadeUp 0.4s ease both';
-  card.innerHTML = `
-    <div class="comment-header">
-      <div class="comment-avatar">${name.charAt(0).toUpperCase()}</div>
-      <div>
-        <strong>${escapeHtml(name)}</strong>
-        ${book ? `<span class="comment-book">${escapeHtml(book)}</span>` : ''}
-      </div>
-      <div class="comment-stars">${starStr || '—'}</div>
-    </div>
-    <p>${escapeHtml(text)}</p>
-  `;
-
-  // Prepend to list
-  commentsList.insertBefore(card, commentsList.firstChild);
-
-  // Reset form
-  document.getElementById('commentName').value  = '';
-  document.getElementById('commentBook').value  = '';
-  document.getElementById('commentText').value  = '';
-  selectedRating = 0;
-  highlightStars(0);
-
-  showToast('Review posted! ✓');
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
-
-// ── Hamburger / Mobile Menu ───────────────────────
-hamburger.addEventListener('click', () => {
-  mobileMenu.classList.toggle('open');
-});
-
-mobileLinks.forEach(link => {
-  link.addEventListener('click', closeMobileMenu);
-});
-
-function closeMobileMenu() {
-  mobileMenu.classList.remove('open');
-}
-
-// Close mobile menu on outside click
+hamburger.addEventListener('click', e => { e.stopPropagation(); mobileMenu.classList.toggle('open'); });
+document.querySelectorAll('.mobile-link').forEach(l => l.addEventListener('click', closeMobMenu));
 document.addEventListener('click', e => {
-  if (!hamburger.contains(e.target) && !mobileMenu.contains(e.target)) {
-    closeMobileMenu();
-  }
+  if (!hamburger.contains(e.target) && !mobileMenu.contains(e.target)) closeMobMenu();
 });
+function closeMobMenu() { mobileMenu.classList.remove('open'); }
 
-// ── Navbar scroll state ───────────────────────────
-const nav = document.querySelector('.nav');
+// ─── NAV SCROLL ───────────────────────────────
+const nav = $('mainNav');
 window.addEventListener('scroll', () => {
-  if (window.scrollY > 40) {
-    nav.style.borderBottomColor = 'rgba(200,169,110,0.15)';
-  } else {
-    nav.style.borderBottomColor = '#2a2a2a';
-  }
-});
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+}, { passive: true });
 
-// ── Toast notification ────────────────────────────
-function showToast(msg) {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = msg;
-  toast.style.cssText = `
-    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-    background: #1f1f1f; border: 1px solid #c8a96e; color: #e8e4dc;
-    padding: 12px 28px; border-radius: 100px; font-size: 0.875rem;
-    font-family: 'DM Sans', sans-serif; z-index: 999;
-    animation: fadeUp 0.3s ease;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
-}
-
-// ── Shake animation on error ──────────────────────
-function shakeElement(el) {
-  el.style.animation = 'none';
-  el.offsetHeight; // reflow
-  el.style.animation = 'shake 0.35s ease';
-  el.addEventListener('animationend', () => el.style.animation = '', { once: true });
-}
-
-// Add shake keyframes dynamically
-const shakeStyle = document.createElement('style');
-shakeStyle.textContent = `
-  @keyframes shake {
-    0%,100% { transform: translateX(0); }
-    20% { transform: translateX(-6px); }
-    40% { transform: translateX(6px); }
-    60% { transform: translateX(-4px); }
-    80% { transform: translateX(4px); }
-  }
-`;
-document.head.appendChild(shakeStyle);
-
-// ── HTML Escape (XSS prevention) ─────────────────
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.appendChild(document.createTextNode(str));
-  return div.innerHTML;
-}
-
-// ── Capitalize first letter ───────────────────────
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-// ── Intersection Observer for book cards ─────────
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach((entry, i) => {
-    if (entry.isIntersecting) {
-      entry.target.style.animationDelay = `${i * 0.05}s`;
-      entry.target.style.animation = 'fadeUp 0.5s ease both';
-      observer.unobserve(entry.target);
+// ─── INTERSECTION OBSERVER ────────────────────
+const io = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      e.target.style.animationDelay = `${i * .045}s`;
+      e.target.style.animation = 'fadeUp .5s ease both';
+      io.unobserve(e.target);
     }
   });
-}, { threshold: 0.1 });
+}, { threshold: .08 });
 
-bookCards.forEach(card => observer.observe(card));
+function observeCards() {
+  document.querySelectorAll('.book-card').forEach(c => io.observe(c));
+}
+
+// ─── UTILITY ──────────────────────────────────
+function $(id) { return document.getElementById(id); }
+function enc(s) { return encodeURIComponent(s); }
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(s)));
+  return d.innerHTML;
+}
+
+function toast(msg) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function shake(el) {
+  el.style.animation = 'none';
+  void el.offsetHeight;
+  el.style.animation = 'shake .35s ease';
+  el.addEventListener('animationend', () => { el.style.animation = ''; }, { once: true });
+}
+
+// ─── BOOT ─────────────────────────────────────
+loadSeedBooks().then(() => observeCards());
